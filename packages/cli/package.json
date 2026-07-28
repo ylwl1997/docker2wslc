@@ -1,0 +1,54 @@
+{
+  "name": "docker2wslc",
+  "version": "0.1.0",
+  "description": "Translate Docker commands and Compose files to wslc, the native WSL container runtime on Windows 11",
+  "type": "module",
+  "bin": {
+    "docker2wslc": "src/cli.js"
+  },
+  "exports": {
+    ".": "./src/translate.js",
+    "./compose": "./src/compose.js",
+    "./rules.json": "./rules.json"
+  },
+  "files": [
+    "src/",
+    "rules.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test 'test/**/*.test.js'",
+    "prepublishOnly": "node --test 'test/**/*.test.js'"
+  },
+  "keywords": [
+    "docker",
+    "wsl",
+    "wslc",
+    "wsl2",
+    "containers",
+    "windows",
+    "compose",
+    "docker-compose",
+    "devcontainer",
+    "docker-desktop-alternative",
+    "cli"
+  ],
+  "homepage": "https://wslcontainers.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ylwl1997/docker2wslc.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/ylwl1997/docker2wslc/issues"
+  },
+  "license": "MIT",
+  "author": "WSL Containers",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "yaml": "^2.5.0"
+  }
+}

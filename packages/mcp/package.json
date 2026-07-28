@@ -1,0 +1,50 @@
+{
+  "name": "wslc-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for wslc (WSL containers) — Docker command translation, Compose migration analysis and tool compatibility checks for AI coding agents",
+  "type": "module",
+  "bin": {
+    "wslc-mcp": "src/server.js"
+  },
+  "files": [
+    "src/",
+    "rules.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test 'test/**/*.test.js'",
+    "start": "node src/server.js"
+  },
+  "keywords": [
+    "mcp",
+    "modelcontextprotocol",
+    "mcp-server",
+    "wslc",
+    "wsl",
+    "docker",
+    "containers",
+    "windows",
+    "claude",
+    "cursor",
+    "ai"
+  ],
+  "homepage": "https://wslcontainers.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ylwl1997/docker2wslc.git",
+    "directory": "packages/mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/ylwl1997/docker2wslc/issues"
+  },
+  "license": "MIT",
+  "author": "WSL Containers",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "yaml": "^2.5.0"
+  }
+}

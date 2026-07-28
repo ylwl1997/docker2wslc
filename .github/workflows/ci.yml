@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install --upgrade pip build twine pytest
+      - run: pip install -e '.[yaml]'
+        working-directory: packages/py
+      - run: python -m pytest tests/ -q
+        working-directory: packages/py
+      - run: python -m build && twine check dist/*
+        working-directory: packages/py
+
+  node:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['18', '20', '22']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: CLI tests
+        run: npm install && npm test
+        working-directory: packages/cli
+      - name: MCP server tests
+        run: npm install && npm test
+        working-directory: packages/mcp
+      - name: VS Code extension tests
+        run: npm install && node --test 'test/**/*.test.cjs'
+        working-directory: packages/vscode
+
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install -e '.[yaml]'
+        working-directory: packages/py
+      - run: npm install
+        working-directory: packages/cli
+      - name: Python and JavaScript engines must agree
+        run: python tests/parity.py
+
+  rules-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package copies of rules.json must match the root
+        run: |
+          fail=0
+          for f in packages/py/src/docker2wslc/rules.json \
+                   packages/cli/rules.json \
+                   packages/mcp/rules.json \
+                   packages/vscode/rules.json; do
+            if ! cmp -s rules.json "$f"; then
+              echo "::error file=$f::out of sync with root rules.json"
+              fail=1
+            fi
+          done
+          exit $fail

@@ -1,0 +1,49 @@
+{
+  "name": "wslc-compatibility",
+  "displayName": "wslc Compatibility (WSL Containers)",
+  "description": "Flags Docker Compose and devcontainer.json keys that will not work with wslc, the native WSL container runtime on Windows 11",
+  "version": "0.1.0",
+  "publisher": "wslcontainers",
+  "license": "MIT",
+  "main": "./src/extension.js",
+  "icon": "icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Linters", "Other"],
+  "keywords": ["wslc", "wsl", "docker", "containers", "compose", "devcontainer", "windows"],
+  "homepage": "https://wslcontainers.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ylwl1997/docker2wslc.git",
+    "directory": "packages/vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/ylwl1997/docker2wslc/issues"
+  },
+  "activationEvents": [
+    "onLanguage:yaml",
+    "onLanguage:json",
+    "onLanguage:jsonc"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "wslc.explainCommand",
+        "title": "wslc: Translate Docker command at cursor",
+        "category": "wslc"
+      },
+      {
+        "command": "wslc.useForDevContainers",
+        "title": "wslc: Use wslc for Dev Containers",
+        "category": "wslc"
+      }
+    ]
+  },
+  "dependencies": {
+    "yaml": "^2.5.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0"
+  }
+}

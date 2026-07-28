@@ -1,0 +1,113 @@
+[
+  {
+    "command": "docker run -it ubuntu:24.04 bash"
+  },
+  {
+    "command": "docker ps"
+  },
+  {
+    "command": "docker ps -a"
+  },
+  {
+    "command": "docker ps -aq"
+  },
+  {
+    "command": "docker images"
+  },
+  {
+    "command": "docker rmi -f abc123"
+  },
+  {
+    "command": "docker rm -f web"
+  },
+  {
+    "command": "docker build -t app:1 ."
+  },
+  {
+    "command": "docker pull nginx:alpine"
+  },
+  {
+    "command": "docker exec -it web sh"
+  },
+  {
+    "command": "docker logs -f web"
+  },
+  {
+    "command": "sudo docker ps"
+  },
+  {
+    "command": "podman run alpine"
+  },
+  {
+    "command": "docker history nginx"
+  },
+  {
+    "command": "docker create --name x alpine"
+  },
+  {
+    "command": "docker build --platform linux/amd64 -t app ."
+  },
+  {
+    "command": "docker build --platform=linux/arm64 ."
+  },
+  {
+    "command": "docker run --gpus all nvidia/cuda:12.4.0-base"
+  },
+  {
+    "command": "docker run --restart always -d redis"
+  },
+  {
+    "command": "docker run --network host alpine"
+  },
+  {
+    "command": "docker run --network mynet alpine"
+  },
+  {
+    "command": "docker run --network=host alpine"
+  },
+  {
+    "command": "docker compose up -d"
+  },
+  {
+    "command": "docker swarm init"
+  },
+  {
+    "command": "docker buildx build ."
+  },
+  {
+    "command": "docker run -v C:/work:/app -it ubuntu bash"
+  },
+  {
+    "command": "docker run alpine sh -c \"echo hello world\""
+  },
+  {
+    "command": "ls -la"
+  },
+  {
+    "command": "docker frobnicate x"
+  },
+  {
+    "command": "docker run --gpus=all --restart=always -p 80:80 nginx"
+  },
+  {
+    "command": "docker run -v /mnt/c/proj:/app alpine"
+  },
+  {
+    "command": "docker context ls"
+  },
+  {
+    "command": "docker plugin ls"
+  },
+  {
+    "command": "docker save img -o out.tar"
+  },
+  {
+    "command": "docker container list --all"
+  },
+  {
+    "command": "docker image list"
+  },
+  {
+    "command": "docker run --platform linux/amd64 --gpus all --network host --restart always -v C:/a:/b nginx"
+  }
+]
