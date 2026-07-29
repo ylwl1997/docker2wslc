@@ -20,12 +20,35 @@ from docker2wslc.compose import analyse
         ("docker logs -f web", "wslc logs -f web"),
         ("sudo docker ps", "wslc container list"),
         ("podman run alpine", "wslc run alpine"),
-        ("docker history nginx", "wslc image history nginx"),
         ("docker create --name x alpine", "wslc container create --name x alpine"),
+        ("docker cp web:/etc/hosts ./hosts", "wslc container cp web:/etc/hosts ./hosts"),
+        ("docker container prune", "wslc container prune"),
     ],
 )
 def test_basic_mapping(src, expected):
     assert translate(src).output == expected
+
+
+# Subcommands absent in every form on wslc 2.9.4.0. `wslc image history` is NOT
+# a valid target: the image noun has no history or search verb.
+@pytest.mark.parametrize(
+    "verb",
+    ["history", "search", "restart", "pause", "unpause", "top", "wait", "port",
+     "rename", "diff", "commit", "info"],
+)
+def test_no_equivalent_subcommands(verb):
+    r = translate(f"docker {verb} nginx")
+    assert r.output.startswith("#"), f"expected a comment, got: {r.output}"
+    assert not r.output.startswith("wslc ")
+    assert r.exit_code == 2
+
+
+def test_system_prune_absent_but_per_noun_prunes_work():
+    r = translate("docker system prune -a")
+    assert r.output.startswith("#"), f"expected a comment, got: {r.output}"
+    assert r.exit_code == 2
+    for noun in ("container", "image", "volume", "network"):
+        assert translate(f"docker {noun} prune").output == f"wslc {noun} prune"
 
 
 def test_platform_dropped():
@@ -39,9 +62,88 @@ def test_platform_inline_dropped():
     assert translate("docker build --platform=linux/arm64 .").output == "wslc build ."
 
 
-def test_gpus_rewritten():
+def test_gpus_kept_never_rewritten_to_device():
+    # wslc 2.9.4.0 has --gpus natively and has NO --device. Rewriting to
+    # --device turns a working command into one that fails with "Argument name
+    # was not recognized". Verified on a Windows Server 2025 runner.
     r = translate("docker run --gpus all nvidia/cuda:12.4.0-base")
-    assert r.output == "wslc run --device nvidia.com/gpu=all nvidia/cuda:12.4.0-base"
+    assert r.output == "wslc run --gpus all nvidia/cuda:12.4.0-base"
+    assert "--device" not in r.output
+
+
+def test_device_dropped_because_wslc_has_no_such_flag():
+    r = translate("docker run --device /dev/snd alpine")
+    assert "--device" not in r.output
+    assert r.exit_code == 1
+
+
+@pytest.mark.parametrize(
+    "src,expected",
+    [
+        ("docker run -m 512m alpine", "wslc run -m 512M alpine"),
+        ("docker run --memory=1g alpine", "wslc run --memory=1G alpine"),
+        ("docker run --shm-size 64m alpine", "wslc run --shm-size 64M alpine"),
+        ("docker run -m 512mb alpine", "wslc run -m 512MB alpine"),
+    ],
+)
+def test_lowercase_size_units_are_rewritten(src, expected):
+    # wslc rejects `512m` with `Invalid memory argument value`; Docker accepts
+    # both cases, so a copied command silently breaks. Fix it, don't just warn.
+    r = translate(src)
+    assert r.output == expected
+    assert r.exit_code == 1
+
+
+def test_already_uppercase_size_is_untouched_and_clean():
+    r = translate("docker run -m 2G alpine")
+    assert r.output == "wslc run -m 2G alpine"
+    assert r.exit_code == 0
+
+
+def test_unparseable_size_is_still_an_error():
+    r = translate("docker run -m bogus alpine")
+    assert r.exit_code == 2
+
+
+# Flags Docker has that `wslc run` does not implement at all: passing them
+# through would produce "Argument name was not recognized" at runtime.
+@pytest.mark.parametrize(
+    "flag,src",
+    [
+        ("--cap-add", "docker run --cap-add NET_ADMIN alpine"),
+        ("--cap-drop", "docker run --cap-drop ALL alpine"),
+        ("--privileged", "docker run --privileged alpine"),
+        ("--security-opt", "docker run --security-opt seccomp=unconfined alpine"),
+        ("--expose", "docker run --expose 8080 nginx"),
+        ("--device", "docker run --device /dev/snd alpine"),
+    ],
+)
+def test_nonexistent_run_flags_are_dropped(flag, src):
+    r = translate(src)
+    assert flag not in r.output, f"{flag} must not survive into the output"
+    assert r.exit_code == 1
+
+
+# Flags that DO exist on wslc run and must survive untouched.
+@pytest.mark.parametrize(
+    "src",
+    [
+        "docker run --gpus all nvidia/cuda:12.4-base",
+        "docker run --health-cmd 'pg_isready -U postgres' postgres:16",
+        "docker run --no-healthcheck redis",
+        "docker run -P nginx",
+        "docker run --ulimit nofile=1024:2048 alpine",
+        "docker run --stop-signal SIGINT alpine",
+        "docker run --dns 1.1.1.1 alpine",
+        "docker run --network none alpine",
+        "docker run --tmpfs /tmp alpine",
+    ],
+)
+def test_supported_flags_survive(src):
+    r = translate(src)
+    flag = [t for t in src.split() if t.startswith("-")][0]
+    assert flag in r.output, f"{flag} exists on wslc and must be kept"
+    assert r.exit_code in (0, 1)
 
 
 def test_restart_dropped_is_warning():
@@ -50,9 +152,15 @@ def test_restart_dropped_is_warning():
     assert r.exit_code == 1
 
 
-def test_network_host_dropped():
+def test_network_host_is_error_not_silently_dropped():
+    # wslc refuses host networking loudly (exit 1, "host mode networking is not
+    # supported") rather than ignoring it, so the result is unmigratable.
     r = translate("docker run --network host alpine")
-    assert r.output == "wslc run alpine"
+    assert r.exit_code == 2
+    assert any(
+        n.severity == "error" and "host mode networking is not supported" in n.text
+        for n in r.notes
+    )
 
 
 def test_network_custom_kept():
@@ -129,7 +237,11 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      retries: 5
+    cap_add: [NET_ADMIN]
+    mem_limit: 512m
 volumes:
   pgdata:
 """
@@ -153,9 +265,37 @@ def test_compose_analysis():
     assert "restart" in missing
 
     db = rep.services[1]
-    assert "healthcheck" in dict(db.missing)
+    # healthcheck IS supported: wslc run has --health-cmd and friends, so the
+    # block is translated into flags rather than reported as missing.
+    assert "healthcheck" not in dict(db.missing)
+    assert "healthcheck" in db.ok
+    assert "--health-cmd 'pg_isready -U postgres'" in db.command
+    assert "--health-interval 10s" in db.command
+    assert "--health-retries 5" in db.command
+    # mem_limit: 512m must be uppercased or wslc rejects it.
+    assert "-m 512M" in db.command
+    assert "cap_add" in dict(db.missing)
+    # Flags wslc does not have must never appear in generated compose commands.
+    for absent in ("--cap-add", "--device", "--privileged", "--security-opt", "--expose"):
+        assert absent not in db.command
     assert "wslc volume create pgdata" in rep.prelude
     assert rep.exit_code == 2
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("30s", "30"),
+        ("1m30s", "90"),   # compound: a single-unit regex would pass this through
+        ("2h5m", "7500"),
+        ("90", "90"),
+        ("bogus", "bogus"),
+    ],
+)
+def test_stop_grace_period_to_seconds(raw, expected):
+    from docker2wslc.compose import _stop_seconds
+
+    assert _stop_seconds(raw) == expected
 
 
 def test_cli_passthrough_of_docker_flags():

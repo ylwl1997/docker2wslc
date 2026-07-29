@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -65,11 +66,62 @@ def _as_list(value: Any) -> list[str]:
     return [str(value)]
 
 
+def _upper_size(value: Any) -> str:
+    """wslc rejects lowercase size units: 512m -> Invalid memory argument value."""
+    return re.sub(
+        r"^(\d+(?:\.\d+)?)\s*([kmgtKMGT])(b?|B?)$",
+        lambda m: m.group(1) + m.group(2).upper() + m.group(3).upper(),
+        str(value),
+    )
+
+
+_UNIT_SECONDS = {"h": 3600, "m": 60, "s": 1, "ms": 0.001, "us": 0.000001}
+
+
+def _stop_seconds(value: Any) -> str:
+    """--stop-timeout takes plain seconds; stop_grace_period is a Go duration.
+
+    Compose allows compound forms like `1m30s`, so a single-unit regex is not
+    enough -- `1m30s` must become 90, not pass through unchanged.
+    """
+    raw = str(value).strip()
+    if re.fullmatch(r"\d+", raw):
+        return raw
+    parts = re.findall(r"(\d+(?:\.\d+)?)(ms|us|h|m|s)", raw)
+    if not parts or "".join(n + u for n, u in parts) != raw:
+        return raw
+    total = sum(float(n) * _UNIT_SECONDS[u] for n, u in parts)
+    return str(round(total))
+
+
+def _shell_quote(value: Any) -> str:
+    """Args are joined into one shell line, so whitespace must be quoted."""
+    s = str(value)
+    if s == "":
+        return "''"
+    if not re.search(r"""[\s"'$`\\|&;<>()*?!#~\[\]{}]""", s):
+        return s
+    return "'" + s.replace("'", "'\\''") + "'"
+
+
+def _health_cmd(test: Any) -> str:
+    """Compose test: is a string, or a list led by CMD / CMD-SHELL / NONE."""
+    if not isinstance(test, list):
+        return str(test)
+    parts = [str(p) for p in test]
+    head = (parts[0] if parts else "").upper()
+    if head in ("CMD-SHELL", "CMD"):
+        return " ".join(parts[1:])
+    if head == "NONE":
+        return ""
+    return " ".join(parts)
+
+
 def _build_run(name: str, svc: dict[str, Any]) -> str:
     args: list[str] = ["wslc", "run", "-d", "--name", svc.get("container_name") or name]
 
     for env in _as_list(svc.get("environment")):
-        args += ["-e", env]
+        args += ["-e", _shell_quote(env)]
     for env_file in _as_list(svc.get("env_file")):
         args += ["--env-file", env_file]
     for port in _as_list(svc.get("ports")):
@@ -78,14 +130,17 @@ def _build_run(name: str, svc: dict[str, Any]) -> str:
         args += ["-v", vol]
     for net in _as_list(svc.get("networks")):
         args += ["--network", net]
-    for cap in _as_list(svc.get("cap_add")):
-        args += ["--cap-add", cap]
-    for dev in _as_list(svc.get("devices")):
-        args += ["--device", dev]
+    # cap_add / cap_drop / devices / privileged / security_opt / expose are
+    # deliberately NOT emitted: wslc 2.9.4 has no such flags, so emitting them
+    # yields "Argument name was not recognized". They surface as findings.
     for label in _as_list(svc.get("labels")):
-        args += ["--label", label]
+        args += ["--label", _shell_quote(label)]
     for tmp in _as_list(svc.get("tmpfs")):
         args += ["--tmpfs", tmp]
+    for dns in _as_list(svc.get("dns")):
+        args += ["--dns", str(dns)]
+    for ulimit in _as_list(svc.get("ulimits")):
+        args += ["--ulimit", _shell_quote(ulimit)]
 
     if svc.get("working_dir"):
         args += ["-w", str(svc["working_dir"])]
@@ -93,9 +148,37 @@ def _build_run(name: str, svc: dict[str, Any]) -> str:
         args += ["-u", str(svc["user"])]
     if svc.get("hostname"):
         args += ["--hostname", str(svc["hostname"])]
+    if svc.get("domainname"):
+        args += ["--domainname", str(svc["domainname"])]
+    if svc.get("shm_size"):
+        args += ["--shm-size", _upper_size(svc["shm_size"])]
+    if svc.get("mem_limit"):
+        args += ["-m", _upper_size(svc["mem_limit"])]
+    if svc.get("cpus"):
+        args += ["--cpus", str(svc["cpus"])]
+    if svc.get("stop_signal"):
+        args += ["--stop-signal", str(svc["stop_signal"])]
+    if svc.get("stop_grace_period"):
+        args += ["--stop-timeout", _stop_seconds(svc["stop_grace_period"])]
+    # healthcheck maps flag-for-flag onto wslc run --health-* (verified 2.9.4.0).
+    hc = svc.get("healthcheck")
+    if isinstance(hc, dict):
+        if hc.get("disable") in (True, "true"):
+            args.append("--no-healthcheck")
+        else:
+            if hc.get("test"):
+                args += ["--health-cmd", _shell_quote(_health_cmd(hc["test"]))]
+            if hc.get("interval"):
+                args += ["--health-interval", str(hc["interval"])]
+            if hc.get("retries"):
+                args += ["--health-retries", str(hc["retries"])]
+            if hc.get("timeout"):
+                args += ["--health-timeout", str(hc["timeout"])]
+            if hc.get("start_period"):
+                args += ["--health-start-period", str(hc["start_period"])]
     if svc.get("entrypoint"):
         ep = svc["entrypoint"]
-        args += ["--entrypoint", ep if isinstance(ep, str) else " ".join(ep)]
+        args += ["--entrypoint", _shell_quote(ep if isinstance(ep, str) else " ".join(ep))]
     if svc.get("stdin_open"):
         args.append("-i")
     if svc.get("tty"):

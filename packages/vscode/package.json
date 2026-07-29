@@ -2,11 +2,14 @@
   "name": "wslc-compatibility",
   "displayName": "wslc Compatibility (WSL Containers)",
   "description": "Flags Docker Compose and devcontainer.json keys that will not work with wslc, the native WSL container runtime on Windows 11",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "wslcontainers",
   "license": "MIT",
   "main": "./src/extension.js",
   "icon": "icon.png",
+  "scripts": {
+    "test": "node --test 'test/**/*.test.cjs'"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },

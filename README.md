@@ -28,13 +28,13 @@ claude mcp add wslc -- npx -y wslc-mcp
 
 ```console
 $ docker2wslc convert docker run --gpus all --restart always -p 8080:80 nginx
-wslc run --device nvidia.com/gpu=all -p 8080:80 nginx
+wslc run --gpus all -p 8080:80 nginx
 
 Migration notes
   WARN  Restart policies are not implemented in the wslc preview. Flag dropped — use a
         Windows scheduled task or a wrapper script for auto-restart.
-  INFO  GPU access in wslc goes through the Container Device Interface. Use
-        `--device nvidia.com/gpu=all` instead of `--gpus`.
+  INFO  `--gpus` is native in wslc 2.9.4, but the host must actually have the GPU: on a
+        machine without one, `--gpus all` fails at container init with an ldconfig error.
 ```
 
 ## Exit codes

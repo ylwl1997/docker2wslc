@@ -45,7 +45,12 @@ class Result:
         """0 clean, 1 degraded (flags dropped/rewritten), 2 unmigratable."""
         if self.unsupported_hit or self.compose_hit:
             return 2
-        if any(n.severity in ("warn", "error") for n in self.notes):
+        # severity=error means wslc refuses the command outright (e.g.
+        # `--network host` exits 1 with "host mode networking is not
+        # supported"), so the result is unmigratable, not merely degraded.
+        if any(n.severity == "error" for n in self.notes):
+            return 2
+        if any(n.severity == "warn" for n in self.notes):
             return 1
         return 0
 
@@ -158,15 +163,28 @@ def _translate_args(args: list[str], notes: list[Note]) -> list[str]:
             notes.append(Note(spec.get("severity", "info"), note_win))
         # Some flags exist but reject certain value formats (verified: wslc wants
         # uppercase size units, so `-m 512m` fails while `512M` works).
-        require = spec.get("requireValuePattern")
-        if require and value and not re.match(require, value):
-            notes.append(Note("error", spec["noteWhenValueRejected"]))
+        emit_value = value
+        fixed = False
+        if spec.get("fixValueCase") == "upperSizeSuffix" and value:
+            up = re.sub(
+                r"^(\d+(?:\.\d+)?)\s*([kmgtKMGT])(b?|B?)$",
+                lambda m: m.group(1) + m.group(2).upper() + m.group(3).upper(),
+                value,
+            )
+            if up != value:
+                emit_value, fixed = up, True
+        if fixed:
+            notes.append(Note("warn", spec["noteWhenValueFixed"]))
+        else:
+            require = spec.get("requireValuePattern")
+            if require and emit_value and not re.match(require, emit_value):
+                notes.append(Note("error", spec["noteWhenValueRejected"]))
         note_always = spec.get("noteAlways")
         if note_always:
             notes.append(Note(spec.get("severity", "info"), note_always))
-        out.append(arg)
-        if not has_inline and takes_value and value:
-            out.append(value)
+        out.append(f"{bare}={emit_value}" if has_inline else arg)
+        if not has_inline and takes_value and emit_value:
+            out.append(emit_value)
         i += consumed
     return out
 

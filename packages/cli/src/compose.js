@@ -12,24 +12,85 @@ function asList(value) {
   return [String(value)];
 }
 
+// wslc rejects lowercase size units: `512m` -> "Invalid memory argument value".
+function upperSize(v) {
+  return String(v).replace(/^(\d+(?:\.\d+)?)\s*([kmgt])(b?)$/i,
+    (_, n, u, b) => n + u.toUpperCase() + b.toUpperCase());
+}
+
+// --stop-timeout takes plain seconds; stop_grace_period is a Go duration.
+// Compose allows compound forms like `1m30s`, so a single-unit regex is not
+// enough -- `1m30s` must become 90, not pass through unchanged.
+const UNIT_SECONDS = { h: 3600, m: 60, s: 1, ms: 0.001, us: 0.000001 };
+function stopSeconds(v) {
+  const raw = String(v).trim();
+  if (/^\d+$/.test(raw)) return raw;
+  const parts = [...raw.matchAll(/(\d+(?:\.\d+)?)(ms|us|h|m|s)/g)];
+  if (!parts.length || parts.map((p) => p[1] + p[2]).join('') !== raw) return raw;
+  const total = parts.reduce((acc, p) => acc + parseFloat(p[1]) * UNIT_SECONDS[p[2]], 0);
+  return String(Math.round(total));
+}
+
+// Values are joined with spaces into one shell line, so anything containing
+// whitespace or shell metacharacters must be quoted or the reader gets a command
+// that silently splits into the wrong arguments.
+function shellQuote(value) {
+  const s = String(value);
+  if (s === '') return "''";
+  if (!/[\s"'$`\\|&;<>()*?!#~\[\]{}]/.test(s)) return s;
+  return `'${s.replace(/'/g, "'\\''")}'`;
+}
+
+// Compose test: is a string (shell form) or an array led by CMD / CMD-SHELL / NONE.
+function healthCmd(test) {
+  if (!Array.isArray(test)) return String(test);
+  const parts = test.map(String);
+  const head = (parts[0] || '').toUpperCase();
+  if (head === 'CMD-SHELL' || head === 'CMD') return parts.slice(1).join(' ');
+  if (head === 'NONE') return '';
+  return parts.join(' ');
+}
+
 function buildRun(name, svc) {
   const args = ['wslc', 'run', '-d', '--name', svc.container_name || name];
 
-  for (const env of asList(svc.environment)) args.push('-e', env);
+  for (const env of asList(svc.environment)) args.push('-e', shellQuote(env));
   for (const f of asList(svc.env_file)) args.push('--env-file', f);
   for (const p of asList(svc.ports)) args.push('-p', String(p).replace(/"/g, ''));
   for (const v of asList(svc.volumes)) args.push('-v', v);
   for (const n of asList(svc.networks)) args.push('--network', n);
-  for (const c of asList(svc.cap_add)) args.push('--cap-add', c);
-  for (const d of asList(svc.devices)) args.push('--device', d);
-  for (const l of asList(svc.labels)) args.push('--label', l);
+  // cap_add / cap_drop / devices / privileged / security_opt / expose are
+  // deliberately NOT emitted: wslc 2.9.4 has no such flags, so emitting them
+  // yields "Argument name was not recognized". They surface as findings instead.
+  for (const l of asList(svc.labels)) args.push('--label', shellQuote(l));
   for (const t of asList(svc.tmpfs)) args.push('--tmpfs', t);
+  for (const d of asList(svc.dns)) args.push('--dns', String(d));
+  for (const u of asList(svc.ulimits)) args.push('--ulimit', shellQuote(u));
 
   if (svc.working_dir) args.push('-w', String(svc.working_dir));
   if (svc.user) args.push('-u', String(svc.user));
   if (svc.hostname) args.push('--hostname', String(svc.hostname));
+  if (svc.domainname) args.push('--domainname', String(svc.domainname));
+  if (svc.shm_size) args.push('--shm-size', upperSize(svc.shm_size));
+  if (svc.mem_limit) args.push('-m', upperSize(svc.mem_limit));
+  if (svc.cpus) args.push('--cpus', String(svc.cpus));
+  if (svc.stop_signal) args.push('--stop-signal', String(svc.stop_signal));
+  if (svc.stop_grace_period) args.push('--stop-timeout', stopSeconds(svc.stop_grace_period));
+  // healthcheck: maps flag-for-flag onto wslc run --health-* (verified 2.9.4.0).
+  const hc = svc.healthcheck;
+  if (hc && typeof hc === 'object') {
+    if (hc.disable === true || hc.disable === 'true') {
+      args.push('--no-healthcheck');
+    } else {
+      if (hc.test) args.push('--health-cmd', shellQuote(healthCmd(hc.test)));
+      if (hc.interval) args.push('--health-interval', String(hc.interval));
+      if (hc.retries) args.push('--health-retries', String(hc.retries));
+      if (hc.timeout) args.push('--health-timeout', String(hc.timeout));
+      if (hc.start_period) args.push('--health-start-period', String(hc.start_period));
+    }
+  }
   if (svc.entrypoint) {
-    args.push('--entrypoint', Array.isArray(svc.entrypoint) ? svc.entrypoint.join(' ') : String(svc.entrypoint));
+    args.push('--entrypoint', shellQuote(Array.isArray(svc.entrypoint) ? svc.entrypoint.join(' ') : String(svc.entrypoint)));
   }
   if (svc.stdin_open) args.push('-i');
   if (svc.tty) args.push('-t');

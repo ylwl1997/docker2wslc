@@ -118,7 +118,9 @@ test('compose diagnostics flag unsupported keys', () => {
   const keys = diags.map((d) => d.message.split(':')[0]);
   assert.ok(keys.includes('restart'), `expected restart, got ${keys}`);
   assert.ok(keys.includes('depends_on'));
-  assert.ok(keys.includes('healthcheck'));
+  // healthcheck is supported on wslc run (--health-cmd et al), so it must NOT
+  // be diagnosed as a problem. Only depends_on gating on health is missing.
+  assert.ok(!keys.includes('healthcheck'), `healthcheck must not be flagged, got ${keys}`);
   assert.ok(keys.includes('volumes'));
   assert.ok(!keys.includes('image'));
   assert.ok(!keys.includes('ports'));

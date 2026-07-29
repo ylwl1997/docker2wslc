@@ -1,6 +1,6 @@
 {
   "name": "docker2wslc",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Translate Docker commands and Compose files to wslc, the native WSL container runtime on Windows 11",
   "type": "module",
   "bin": {

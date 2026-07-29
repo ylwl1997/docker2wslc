@@ -1,6 +1,6 @@
 {
   "name": "wslc-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server for wslc (WSL containers) — Docker command translation, Compose migration analysis and tool compatibility checks for AI coding agents",
   "type": "module",
   "bin": {

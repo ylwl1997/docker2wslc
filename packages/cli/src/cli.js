@@ -8,7 +8,7 @@ import process from 'node:process';
 import { analyse } from './compose.js';
 import { RULES, translate } from './translate.js';
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 const COMPOSE_NAMES = ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml'];
 const SEV_COLOR = { error: '\x1b[31m', warn: '\x1b[33m', info: '\x1b[36m' };
 const RESET = '\x1b[0m';

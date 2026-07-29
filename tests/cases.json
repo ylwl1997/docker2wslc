@@ -205,5 +205,56 @@
   },
   {
     "command": "docker network prune"
+  },
+  {
+    "command": "docker cp ./app.conf web:/etc/app.conf"
+  },
+  {
+    "command": "docker run --rm -m 512m --shm-size 64m alpine sh"
+  },
+  {
+    "command": "docker run --rm -m 2G alpine sh"
+  },
+  {
+    "command": "docker run --rm --memory=1g alpine sh"
+  },
+  {
+    "command": "docker run --network none alpine"
+  },
+  {
+    "command": "docker run -P nginx"
+  },
+  {
+    "command": "docker run --stop-signal SIGINT --stop-timeout 30 alpine"
+  },
+  {
+    "command": "docker run --ulimit nofile=1024:2048 alpine"
+  },
+  {
+    "command": "docker run --dns 1.1.1.1 --domainname corp.local alpine"
+  },
+  {
+    "command": "docker run --health-cmd 'pg_isready -U postgres' --health-interval 10s postgres:16"
+  },
+  {
+    "command": "docker run --no-healthcheck redis"
+  },
+  {
+    "command": "docker run --cap-add NET_ADMIN alpine"
+  },
+  {
+    "command": "docker run --privileged alpine"
+  },
+  {
+    "command": "docker run --security-opt seccomp=unconfined alpine"
+  },
+  {
+    "command": "docker run --expose 8080 nginx"
+  },
+  {
+    "command": "docker run --device /dev/snd alpine"
+  },
+  {
+    "command": "docker run --gpus device=0 nvidia/cuda:12.4-base"
   }
 ]

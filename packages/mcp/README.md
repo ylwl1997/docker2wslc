@@ -46,13 +46,13 @@ No API key, no network calls, no telemetry. Translation is entirely local and ru
 > **You:** convert `docker run --gpus all --restart always -p 80:80 nginx` for wslc
 
 ```
-wslc run --device nvidia.com/gpu=all -p 80:80 nginx
+wslc run --gpus all -p 80:80 nginx
 
 Migration notes:
 - [warn] Restart policies are not implemented in the wslc preview. Flag dropped — use a
   Windows scheduled task or a wrapper script for auto-restart.
-- [info] GPU access in wslc goes through the Container Device Interface. Use
-  `--device nvidia.com/gpu=all` instead of `--gpus`.
+- [info] `--gpus` is native in wslc 2.9.4, but the host must actually have the GPU: on a
+  machine without one, `--gpus all` fails at container init with an ldconfig error.
 
 Verdict: degraded (flags changed)
 ```

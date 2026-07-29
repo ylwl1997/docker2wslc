@@ -78,12 +78,14 @@ test('tools/list exposes all five tools with schemas', async () => {
   }
 });
 
-test('convert_docker_command rewrites --gpus and drops --restart', async () => {
+test('convert_docker_command keeps --gpus and drops --restart', async () => {
   const { text, isError } = await callText('convert_docker_command', {
     command: 'docker run --gpus all --restart always -p 8080:80 nginx',
   });
   assert.equal(isError, false);
-  assert.match(text, /wslc run --device nvidia\.com\/gpu=all -p 8080:80 nginx/);
+  // --gpus is native on wslc 2.9.4.0; --device is the flag that does NOT exist.
+  assert.match(text, /wslc run --gpus all -p 8080:80 nginx/);
+  assert.ok(!text.includes('--device'), 'must not invent a --device rewrite');
   assert.match(text, /[Rr]estart polic/);
   assert.match(text, /degraded/i);
 });
@@ -114,7 +116,9 @@ test('analyze_compose emits run commands and flags blockers', async () => {
   assert.match(text, /postgres:16/);
   assert.match(text, /restart/);
   assert.match(text, /depends_on/);
-  assert.match(text, /healthcheck/);
+  // healthcheck is supported: it becomes --health-* flags rather than a blocker.
+  assert.match(text, /--health-cmd pg_isready/);
+  assert.ok(!/BLOCKED healthcheck/.test(text), 'healthcheck must not be reported as blocked');
 });
 
 test('analyze_compose errors on malformed yaml', async () => {

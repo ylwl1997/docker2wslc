@@ -128,7 +128,9 @@
       "noteWhenValueRejected": "wslc rejects lowercase size units: `--memory 512m` fails with `Invalid memory argument value`. Use an UPPERCASE suffix (512M, 1G) or a plain byte count.",
       "aliases": [
         "-m"
-      ]
+      ],
+      "fixValueCase": "upperSizeSuffix",
+      "noteWhenValueFixed": "Rewrote the size to use an UPPERCASE unit suffix: wslc rejects lowercase units (`Invalid memory argument value`) while Docker accepts both."
     },
     "--shm-size": {
       "action": "keep",
@@ -136,7 +138,9 @@
       "severity": "info",
       "note": "Supported. Same uppercase-unit rule as --memory: `64M` works, `64m` is rejected.",
       "requireValuePattern": "^[0-9]+([KMGT]|[KMGT]B)?$",
-      "noteWhenValueRejected": "wslc rejects lowercase size units: `--shm-size 64m` fails with `Invalid shm-size argument value`. Use an UPPERCASE suffix (64M, 1G)."
+      "noteWhenValueRejected": "wslc rejects lowercase size units: `--shm-size 64m` fails with `Invalid shm-size argument value`. Use an UPPERCASE suffix (64M, 1G).",
+      "fixValueCase": "upperSizeSuffix",
+      "noteWhenValueFixed": "Rewrote the size to use an UPPERCASE unit suffix: wslc rejects lowercase units (`Invalid shm-size argument value`) while Docker accepts both."
     },
     "--cpus": {
       "action": "keep",
@@ -176,6 +180,36 @@
       ],
       "severity": "info",
       "note": "Supported (`-p`). `-P/--publish-all` publishes all exposed ports."
+    },
+    "--cap-add": {
+      "action": "drop",
+      "takesValue": true,
+      "severity": "warn",
+      "note": "wslc 2.9.4 has no --cap-add (`Argument name was not recognized`). There is no way to grant extra capabilities; --privileged and --security-opt are missing too."
+    },
+    "--cap-drop": {
+      "action": "drop",
+      "takesValue": true,
+      "severity": "warn",
+      "note": "wslc 2.9.4 has no --cap-drop (`Argument name was not recognized`)."
+    },
+    "--privileged": {
+      "action": "drop",
+      "takesValue": false,
+      "severity": "warn",
+      "note": "wslc 2.9.4 has no --privileged (`Argument name was not recognized`)."
+    },
+    "--security-opt": {
+      "action": "drop",
+      "takesValue": true,
+      "severity": "warn",
+      "note": "wslc 2.9.4 has no --security-opt (`Argument name was not recognized`)."
+    },
+    "--expose": {
+      "action": "drop",
+      "takesValue": true,
+      "severity": "warn",
+      "note": "wslc 2.9.4 has no --expose. Publish the port with -p, or use -P/--publish-all to publish every port the image exposes."
     }
   },
   "compose": {
@@ -242,14 +276,12 @@
         "maps": "--label"
       },
       "cap_add": {
-        "status": "partial",
-        "maps": "--cap-add",
-        "note": "Some capabilities are restricted inside the utility VM."
+        "status": "missing",
+        "note": "wslc 2.9.4 has no --cap-add (`Argument name was not recognized`), and no --privileged or --security-opt either."
       },
       "devices": {
-        "status": "partial",
-        "maps": "--device",
-        "note": "CDI syntax differs from Docker for GPUs."
+        "status": "missing",
+        "note": "wslc 2.9.4 has no --device. GPUs go through --gpus; there is no generic device passthrough."
       },
       "tmpfs": {
         "status": "ok",
@@ -268,8 +300,10 @@
         "note": "No restart policies in the wslc preview."
       },
       "healthcheck": {
-        "status": "missing",
-        "note": "wslc has no healthcheck support; depends_on conditions relying on it cannot work."
+        "status": "ok",
+        "maps": "--health-cmd / --health-interval / --health-retries / --health-timeout / --health-start-period",
+        "emit": "health",
+        "note": "wslc run implements all five health flags plus --no-healthcheck. Nothing reads the compose file, so the flags are emitted onto the run command for you. What is still missing is depends_on gating on health state."
       },
       "depends_on": {
         "status": "missing",
@@ -294,6 +328,57 @@
       "secrets": {
         "status": "missing",
         "note": "Swarm secrets are unsupported; use -e or a mounted file."
+      },
+      "cap_drop": {
+        "status": "missing",
+        "note": "wslc 2.9.4 has no --cap-drop."
+      },
+      "expose": {
+        "status": "missing",
+        "note": "No --expose on wslc run. Publish with ports: (-p), or use -P to publish everything the image exposes."
+      },
+      "network_mode": {
+        "status": "missing",
+        "note": "network_mode: host is refused with `host mode networking is not supported`. Use a user-defined network plus published ports."
+      },
+      "privileged": {
+        "status": "missing",
+        "note": "No --privileged on wslc run."
+      },
+      "security_opt": {
+        "status": "missing",
+        "note": "No --security-opt on wslc run."
+      },
+      "shm_size": {
+        "status": "ok",
+        "maps": "--shm-size",
+        "note": "Unit suffix must be UPPERCASE (64M, not 64m)."
+      },
+      "mem_limit": {
+        "status": "ok",
+        "maps": "-m",
+        "note": "Unit suffix must be UPPERCASE (512M, not 512m)."
+      },
+      "dns": {
+        "status": "ok",
+        "maps": "--dns"
+      },
+      "ulimits": {
+        "status": "ok",
+        "maps": "--ulimit"
+      },
+      "domainname": {
+        "status": "ok",
+        "maps": "--domainname"
+      },
+      "stop_signal": {
+        "status": "ok",
+        "maps": "--stop-signal"
+      },
+      "stop_grace_period": {
+        "status": "ok",
+        "maps": "--stop-timeout",
+        "note": "Converted to whole seconds."
       }
     }
   },

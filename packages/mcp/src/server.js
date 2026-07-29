@@ -92,8 +92,8 @@ const TOOLS = [
     name: 'get_wslc_limitations',
     description:
       'List the known limitations of the wslc preview compared to Docker: no Compose runtime, ' +
-      'no restart policies, no --platform, no healthchecks, no Docker socket/Engine API, no ' +
-      'buildx, GPU via CDI. Use when a user asks what they give up by switching from Docker Desktop.',
+      'no restart policies, no --platform, no Docker socket/Engine API, no ' +
+      'buildx, and the run flags wslc lacks. Use when a user asks what they give up by switching from Docker Desktop.',
     inputSchema: { type: 'object', properties: {} },
   },
 ];
@@ -216,14 +216,24 @@ function handleLimitations() {
     'wslc preview limitations vs Docker:',
     '',
     '- No Compose runtime — translate services to individual wslc run calls',
-    '- No restart policies — use a Windows scheduled task',
+    '- No restart policies — --restart is rejected, and there is no wslc restart either (stop then start)',
     '- No --platform — host architecture only',
-    '- No healthchecks — depends_on conditions cannot work',
     '- No Docker socket or Engine API — Testcontainers, Portainer, act cannot attach',
     '- No buildx / bake — single-platform wslc build only',
-    '- GPU via CDI — use --device nvidia.com/gpu=all, not --gpus all',
     '- No Swarm (service, stack, node, secret, config)',
+    '- No --device, --cap-add, --cap-drop, --privileged, --security-opt or --expose',
+    '- No --network host (rejected: "host mode networking is not supported"); --network none works',
+    '- Missing subcommands: restart, pause, unpause, top, wait, port, rename, diff, commit, info, image history, image search, system prune/df/info',
     '- Windows paths shared over VirtioFS — use forward slashes',
+    '',
+    'Things that DO work and must not be called missing:',
+    '- --gpus is native, exactly as in Docker (--gpus all). It is --device that does NOT exist.',
+    '- Health checks on wslc run: --health-cmd, --health-interval, --health-retries,',
+    '  --health-start-period, --health-timeout, --no-healthcheck. What is missing is a',
+    '  Compose runtime to read a healthcheck: block, not the feature itself.',
+    '- --tmpfs, --ulimit, --shm-size, -m/--memory, --cpus, -P, --stop-signal, --stop-timeout, --dns, --cidfile',
+    '- Per-noun prune: wslc container/image/volume/network prune',
+    '- Memory units must be UPPERCASE: 512m is rejected, 512M works',
     '',
     'Verb renames: ' +
       Object.entries(RULES.renamed).map(([k, v]) => `docker ${k} -> wslc ${v}`).join(', '),

@@ -16,13 +16,13 @@ npx docker2wslc convert docker ps -a
 
 ```console
 $ docker2wslc convert docker run --gpus all --restart always -p 8080:80 nginx
-wslc run --device nvidia.com/gpu=all -p 8080:80 nginx
+wslc run --gpus all -p 8080:80 nginx
 
 Migration notes
   WARN  Restart policies are not implemented in the wslc preview. Flag dropped — use a
         Windows scheduled task or a wrapper script for auto-restart.
-  INFO  GPU access in wslc goes through the Container Device Interface. Use
-        `--device nvidia.com/gpu=all` instead of `--gpus`.
+  INFO  `--gpus` is native in wslc 2.9.4, but the host must actually have the GPU: on a
+        machine without one, `--gpus all` fails at container init with an ldconfig error.
 ```
 
 Commands come from arguments, a file, or stdin:
@@ -44,15 +44,18 @@ $ docker2wslc compose docker-compose.yml
 
 wslc volume create pgdata
 wslc network create backend
+# start order matters: web -> db
 
 # service: web
 wslc run -d --name web -e NGINX_HOST=localhost -p 8080:80 --network backend nginx:alpine
+  ! networks: Bridge-only. Create with wslc network create before running.
   x depends_on: No dependency ordering. Start services in order yourself and add readiness waits.
   x restart: No restart policies in the wslc preview.
 
 # service: db
-wslc run -d --name db -v pgdata:/var/lib/postgresql/data postgres:16-alpine
-  x healthcheck: wslc has no healthcheck support; depends_on conditions relying on it cannot work.
+wslc run -d --name db -v pgdata:/var/lib/postgresql/data --network backend --health-cmd 'pg_isready -U postgres' --health-interval 10s --health-retries 5 postgres:16-alpine
+  ! volumes: Named volumes must be created first with wslc volume create. Windows paths go over VirtioFS.
+  ! networks: Bridge-only. Create with wslc network create before running.
 ```
 
 ## Lint a repository
@@ -103,10 +106,10 @@ Worth knowing before you migrate. These are runtime limitations, not gaps in thi
 - **No Compose runtime** — translate services by hand, see the [migration guide](https://wslcontainers.com/guides/compose/)
 - **No restart policies** — use a scheduled task
 - **No `--platform`** — host architecture only
-- **No healthchecks** — so `depends_on` conditions cannot work
+- **No `depends_on` gating** — health flags work (`--health-cmd` et al), but nothing waits on health state for you
 - **No Docker socket or Engine API** — [Testcontainers, Portainer and act cannot attach](https://wslcontainers.com/guides/testcontainers/)
 - **No buildx / bake** — single-platform `wslc build` only
-- **GPU via CDI** — `--device nvidia.com/gpu=all`, not `--gpus all`
+- **GPU** — `--gpus all`, the same flag as Docker. It is `--device` that wslc lacks.
 
 CLI-driven tooling ports to wslc. API-driven tooling does not. That single distinction
 explains most migration surprises — including why

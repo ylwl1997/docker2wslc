@@ -104,14 +104,23 @@ function translateArgs(args, notes) {
     }
     // Some flags exist but reject certain value formats (verified: wslc wants
     // uppercase size units, so `-m 512m` fails while `512M` works).
-    if (spec.requireValuePattern && value && !new RegExp(spec.requireValuePattern).test(value)) {
+    let emitValue = value;
+    let fixed = false;
+    if (spec.fixValueCase === 'upperSizeSuffix' && value) {
+      const up = value.replace(/^(\d+(?:\.\d+)?)\s*([kmgt])(b?)$/i,
+        (_, n, u, b) => n + u.toUpperCase() + b.toUpperCase());
+      if (up !== value) { emitValue = up; fixed = true; }
+    }
+    if (fixed) {
+      notes.push({ severity: 'warn', text: spec.noteWhenValueFixed });
+    } else if (spec.requireValuePattern && emitValue && !new RegExp(spec.requireValuePattern).test(emitValue)) {
       notes.push({ severity: 'error', text: spec.noteWhenValueRejected });
     }
     if (spec.noteAlways) {
       notes.push({ severity: spec.severity || 'info', text: spec.noteAlways });
     }
-    out.push(arg);
-    if (!hasInline && takesValue && value) out.push(value);
+    out.push(hasInline ? `${bare}=${emitValue}` : arg);
+    if (!hasInline && takesValue && emitValue) out.push(emitValue);
     i += consumed;
   }
   return out;
@@ -119,7 +128,11 @@ function translateArgs(args, notes) {
 
 export function exitCodeFor({ notes, composeHit, unsupportedHit }) {
   if (unsupportedHit || composeHit) return 2;
-  if (notes.some((n) => n.severity === 'warn' || n.severity === 'error')) return 1;
+  // severity=error means wslc refuses the command outright (e.g. `--network
+  // host` exits 1 with "host mode networking is not supported"), so the result
+  // is unmigratable, not merely degraded. Only warn = dropped-but-runnable.
+  if (notes.some((n) => n.severity === 'error')) return 2;
+  if (notes.some((n) => n.severity === 'warn')) return 1;
   return 0;
 }
 
