@@ -1,12 +1,26 @@
 {
-  "$comment": "Single source of truth for Docker -> wslc translation. Consumed by the Python package, the npm CLI, the MCP server and the VS Code extension. Do not fork this logic per language.",
-  "schemaVersion": 1,
-  "wslcPreview": "2026-07",
+  "$comment": "Single source of truth for Docker -> wslc translation. Consumed by the Python package, the npm CLI, the MCP server and the VS Code extension. Do not fork this logic per language. Every claim here is verified against a real wslc on a windows-2025 runner; see `verification`.",
+  "schemaVersion": 2,
+  "wslcPreview": "2.9.4.0",
   "identical": [
-    "run", "build", "pull", "push", "stop", "start", "restart", "exec", "logs",
-    "inspect", "stats", "cp", "tag", "login", "logout", "kill", "pause",
-    "unpause", "version", "info", "top", "wait", "port", "rename", "diff",
-    "commit", "save", "load", "attach"
+    "run",
+    "build",
+    "pull",
+    "push",
+    "stop",
+    "start",
+    "exec",
+    "logs",
+    "inspect",
+    "stats",
+    "tag",
+    "login",
+    "logout",
+    "kill",
+    "save",
+    "load",
+    "attach",
+    "version"
   ],
   "renamed": {
     "ps": "container list",
@@ -14,14 +28,27 @@
     "rmi": "image remove",
     "rm": "container remove",
     "create": "container create",
-    "history": "image history",
-    "search": "image search"
+    "cp": "container cp"
   },
   "renamedFlags": {
-    "ps": { "-a": "--all", "--all": "--all", "-q": "--quiet", "--quiet": "--quiet" },
-    "images": { "-a": "--all", "--all": "--all" },
-    "rm": { "-f": "--force", "--force": "--force" },
-    "rmi": { "-f": "--force", "--force": "--force" }
+    "ps": {
+      "-a": "--all",
+      "--all": "--all",
+      "-q": "--quiet",
+      "--quiet": "--quiet"
+    },
+    "images": {
+      "-a": "--all",
+      "--all": "--all"
+    },
+    "rm": {
+      "-f": "--force",
+      "--force": "--force"
+    },
+    "rmi": {
+      "-f": "--force",
+      "--force": "--force"
+    }
   },
   "unsupported": {
     "swarm": "Swarm orchestration has no wslc equivalent. Use Kubernetes or keep Docker for this workload.",
@@ -35,7 +62,19 @@
     "buildx": "buildx / bake is not available. Use wslc build for single-platform images.",
     "manifest": "Manifest lists cannot be created with wslc in the preview.",
     "trust": "Docker Content Trust is Docker-specific and has no wslc equivalent.",
-    "checkpoint": "Checkpoint/restore is not implemented in wslc."
+    "checkpoint": "Checkpoint/restore is not implemented in wslc.",
+    "restart": "No restart command in wslc 2.9.4. Run `wslc stop <id>` then `wslc start <id>`.",
+    "pause": "Pause/unpause (SIGSTOP freezing) is not implemented in wslc 2.9.4.",
+    "unpause": "Pause/unpause is not implemented in wslc 2.9.4.",
+    "info": "No `system info`. `wslc system` only exposes `session`. Use `wslc version` for build info.",
+    "top": "No `top`. Use `wslc exec <id> ps aux` inside the container.",
+    "wait": "No `wait`. Poll `wslc container list` or run the container in the foreground without --detach.",
+    "port": "No `port` command. Published ports are shown in the PORTS column of `wslc container list`.",
+    "rename": "Containers cannot be renamed in wslc 2.9.4. Recreate with the desired --name.",
+    "diff": "No filesystem diff. `wslc export <id>` writes the container filesystem to a tar for inspection.",
+    "commit": "No commit. Use `wslc export` then `wslc import`, or build from a Dockerfile.",
+    "history": "wslc 2.9.4 has no image history. `wslc image inspect` shows config but not per-layer history.",
+    "search": "wslc 2.9.4 cannot search a registry. Browse Docker Hub / the registry web UI instead."
   },
   "flags": {
     "--platform": {
@@ -51,31 +90,92 @@
       "note": "Restart policies are not implemented in the wslc preview. Flag dropped — use a Windows scheduled task or a wrapper script for auto-restart."
     },
     "--gpus": {
-      "action": "rewrite",
+      "action": "keep",
       "takesValue": true,
-      "replaceWith": "--device nvidia.com/gpu=all",
       "severity": "info",
-      "note": "GPU access in wslc goes through the Container Device Interface. Use `--device nvidia.com/gpu=all` instead of `--gpus`."
+      "note": "`--gpus` is native in wslc 2.9.4 (`--gpus all`). Do NOT rewrite it to `--device`: wslc has no --device flag. On a host without an NVIDIA GPU the run fails at container init with an ldconfig error.",
+      "noteAlways": "`--gpus` is native in wslc 2.9.4, but the host must actually have the GPU: on a machine without one, `--gpus all` fails at container init with an ldconfig error."
     },
     "--network": {
       "action": "conditional",
       "takesValue": true,
       "whenValue": {
         "host": {
-          "action": "drop",
-          "severity": "info",
-          "note": "`--network host` behaves differently: wslc routes container traffic through the Windows host stack already, so host networking is implicit. Flag dropped."
+          "action": "error",
+          "severity": "error",
+          "note": "wslc rejects host networking outright: `host mode networking is not supported` (exit 1). It is not implicit and cannot be dropped silently. `--network none` works."
         }
       },
       "severity": "info",
-      "note": "Custom networks are supported but bridge-only. Create it first with `wslc network create`."
+      "note": "Custom networks are supported: create with `wslc network create`, then `wslc network connect`. `none` is valid; `host` is rejected."
     },
     "--volume": {
       "action": "keep",
       "takesValue": true,
-      "aliases": ["-v", "--mount"],
+      "aliases": [
+        "-v",
+        "--mount"
+      ],
       "severity": "info",
       "noteWhenWindowsPath": "Windows host paths are shared over VirtioFS. Use forward slashes (`C:/work:/app`) and expect Linux-style permissions on the container side."
+    },
+    "--memory": {
+      "action": "keep",
+      "takesValue": true,
+      "severity": "info",
+      "note": "Supported (`-m`). Unit suffix must be UPPERCASE: `512M` works, `512m` is rejected with `Invalid memory argument value`. Plain byte counts also work. Expect a kernel warning that swap limits are unavailable.",
+      "requireValuePattern": "^[0-9]+([KMGT]|[KMGT]B)?$",
+      "noteWhenValueRejected": "wslc rejects lowercase size units: `--memory 512m` fails with `Invalid memory argument value`. Use an UPPERCASE suffix (512M, 1G) or a plain byte count.",
+      "aliases": [
+        "-m"
+      ]
+    },
+    "--shm-size": {
+      "action": "keep",
+      "takesValue": true,
+      "severity": "info",
+      "note": "Supported. Same uppercase-unit rule as --memory: `64M` works, `64m` is rejected.",
+      "requireValuePattern": "^[0-9]+([KMGT]|[KMGT]B)?$",
+      "noteWhenValueRejected": "wslc rejects lowercase size units: `--shm-size 64m` fails with `Invalid shm-size argument value`. Use an UPPERCASE suffix (64M, 1G)."
+    },
+    "--cpus": {
+      "action": "keep",
+      "takesValue": true,
+      "severity": "info",
+      "note": "Supported, accepts fractional values (0.5, 1, 2.5)."
+    },
+    "--ulimit": {
+      "action": "keep",
+      "takesValue": true,
+      "severity": "info",
+      "note": "Supported, e.g. `--ulimit nofile=1024:1024`."
+    },
+    "--stop-timeout": {
+      "action": "keep",
+      "takesValue": true,
+      "severity": "info",
+      "note": "Supported, seconds; -1 means no timeout."
+    },
+    "--health-cmd": {
+      "action": "keep",
+      "takesValue": true,
+      "severity": "info",
+      "note": "Supported. wslc has the full health-check family: --health-cmd, --health-interval, --health-retries, --health-start-period, --health-timeout, --no-healthcheck."
+    },
+    "--device": {
+      "action": "drop",
+      "takesValue": true,
+      "severity": "warn",
+      "note": "wslc 2.9.4 has no --device flag (`Argument name was not recognized`). For GPUs use --gpus."
+    },
+    "--publish": {
+      "action": "keep",
+      "takesValue": true,
+      "aliases": [
+        "-p"
+      ],
+      "severity": "info",
+      "note": "Supported (`-p`). `-P/--publish-all` publishes all exposed ports."
     }
   },
   "compose": {
@@ -83,57 +183,195 @@
     "note": "wslc has no built-in Compose runtime. Translate each service into a wslc run call, or drive them from a PowerShell/bash script.",
     "docsUrl": "https://wslcontainers.com/guides/compose/",
     "keys": {
-      "image":        { "status": "ok",      "maps": "positional image argument" },
-      "build":        { "status": "ok",      "maps": "wslc build -t <name>" },
-      "command":      { "status": "ok",      "maps": "trailing command args" },
-      "entrypoint":   { "status": "ok",      "maps": "--entrypoint" },
-      "environment":  { "status": "ok",      "maps": "-e KEY=VALUE" },
-      "env_file":     { "status": "ok",      "maps": "--env-file" },
-      "ports":        { "status": "ok",      "maps": "-p HOST:CONTAINER" },
-      "volumes":      { "status": "partial", "maps": "-v", "note": "Named volumes must be created first with wslc volume create. Windows paths go over VirtioFS." },
-      "networks":     { "status": "partial", "maps": "--network", "note": "Bridge-only. Create with wslc network create before running." },
-      "working_dir":  { "status": "ok",      "maps": "-w" },
-      "user":         { "status": "ok",      "maps": "-u" },
-      "hostname":     { "status": "ok",      "maps": "--hostname" },
-      "container_name": { "status": "ok",    "maps": "--name" },
-      "labels":       { "status": "ok",      "maps": "--label" },
-      "cap_add":      { "status": "partial", "maps": "--cap-add", "note": "Some capabilities are restricted inside the utility VM." },
-      "devices":      { "status": "partial", "maps": "--device", "note": "CDI syntax differs from Docker for GPUs." },
-      "tmpfs":        { "status": "ok",      "maps": "--tmpfs" },
-      "stdin_open":   { "status": "ok",      "maps": "-i" },
-      "tty":          { "status": "ok",      "maps": "-t" },
-      "restart":      { "status": "missing", "note": "No restart policies in the wslc preview." },
-      "healthcheck":  { "status": "missing", "note": "wslc has no healthcheck support; depends_on conditions relying on it cannot work." },
-      "depends_on":   { "status": "missing", "note": "No dependency ordering. Start services in order yourself and add readiness waits." },
-      "deploy":       { "status": "missing", "note": "Swarm-only section, ignored entirely." },
-      "profiles":     { "status": "missing", "note": "Compose-only concept." },
-      "extends":      { "status": "missing", "note": "Compose-only concept." },
-      "configs":      { "status": "missing", "note": "Swarm configs are unsupported; mount a file instead." },
-      "secrets":      { "status": "missing", "note": "Swarm secrets are unsupported; use -e or a mounted file." }
+      "image": {
+        "status": "ok",
+        "maps": "positional image argument"
+      },
+      "build": {
+        "status": "ok",
+        "maps": "wslc build -t <name>"
+      },
+      "command": {
+        "status": "ok",
+        "maps": "trailing command args"
+      },
+      "entrypoint": {
+        "status": "ok",
+        "maps": "--entrypoint"
+      },
+      "environment": {
+        "status": "ok",
+        "maps": "-e KEY=VALUE"
+      },
+      "env_file": {
+        "status": "ok",
+        "maps": "--env-file"
+      },
+      "ports": {
+        "status": "ok",
+        "maps": "-p HOST:CONTAINER"
+      },
+      "volumes": {
+        "status": "partial",
+        "maps": "-v",
+        "note": "Named volumes must be created first with wslc volume create. Windows paths go over VirtioFS."
+      },
+      "networks": {
+        "status": "partial",
+        "maps": "--network",
+        "note": "Bridge-only. Create with wslc network create before running."
+      },
+      "working_dir": {
+        "status": "ok",
+        "maps": "-w"
+      },
+      "user": {
+        "status": "ok",
+        "maps": "-u"
+      },
+      "hostname": {
+        "status": "ok",
+        "maps": "--hostname"
+      },
+      "container_name": {
+        "status": "ok",
+        "maps": "--name"
+      },
+      "labels": {
+        "status": "ok",
+        "maps": "--label"
+      },
+      "cap_add": {
+        "status": "partial",
+        "maps": "--cap-add",
+        "note": "Some capabilities are restricted inside the utility VM."
+      },
+      "devices": {
+        "status": "partial",
+        "maps": "--device",
+        "note": "CDI syntax differs from Docker for GPUs."
+      },
+      "tmpfs": {
+        "status": "ok",
+        "maps": "--tmpfs"
+      },
+      "stdin_open": {
+        "status": "ok",
+        "maps": "-i"
+      },
+      "tty": {
+        "status": "ok",
+        "maps": "-t"
+      },
+      "restart": {
+        "status": "missing",
+        "note": "No restart policies in the wslc preview."
+      },
+      "healthcheck": {
+        "status": "missing",
+        "note": "wslc has no healthcheck support; depends_on conditions relying on it cannot work."
+      },
+      "depends_on": {
+        "status": "missing",
+        "note": "No dependency ordering. Start services in order yourself and add readiness waits."
+      },
+      "deploy": {
+        "status": "missing",
+        "note": "Swarm-only section, ignored entirely."
+      },
+      "profiles": {
+        "status": "missing",
+        "note": "Compose-only concept."
+      },
+      "extends": {
+        "status": "missing",
+        "note": "Compose-only concept."
+      },
+      "configs": {
+        "status": "missing",
+        "note": "Swarm configs are unsupported; mount a file instead."
+      },
+      "secrets": {
+        "status": "missing",
+        "note": "Swarm secrets are unsupported; use -e or a mounted file."
+      }
     }
   },
   "devcontainer": {
     "keys": {
-      "image":             { "status": "ok" },
-      "build.dockerfile":  { "status": "ok" },
-      "build.args":        { "status": "ok",      "maps": "--build-arg" },
-      "build.platform":    { "status": "missing", "note": "Host architecture only." },
-      "workspaceMount":    { "status": "partial", "note": "VirtioFS; use forward slashes for Windows paths." },
-      "workspaceFolder":   { "status": "ok" },
-      "containerEnv":      { "status": "ok",      "maps": "-e" },
-      "remoteEnv":         { "status": "ok" },
-      "forwardPorts":      { "status": "ok",      "maps": "-p" },
-      "postCreateCommand": { "status": "ok",      "maps": "wslc exec" },
-      "postStartCommand":  { "status": "ok" },
-      "postAttachCommand": { "status": "ok" },
-      "remoteUser":        { "status": "ok",      "maps": "-u" },
-      "containerUser":     { "status": "ok" },
-      "mounts":            { "status": "partial", "note": "VirtioFS path rules apply." },
-      "runArgs":           { "status": "partial", "note": "Passed through verbatim; unsupported flags will fail at runtime." },
-      "dockerComposeFile": { "status": "missing", "note": "No Compose runtime. Replace with a single image or build entry." },
-      "features":          { "status": "missing", "note": "Requires BuildKit metadata that wslc build does not emit." },
-      "runServices":       { "status": "missing", "note": "Compose-only key." },
-      "shutdownAction":    { "status": "partial", "note": "stopCompose is meaningless without Compose." }
+      "image": {
+        "status": "ok"
+      },
+      "build.dockerfile": {
+        "status": "ok"
+      },
+      "build.args": {
+        "status": "ok",
+        "maps": "--build-arg"
+      },
+      "build.platform": {
+        "status": "missing",
+        "note": "Host architecture only."
+      },
+      "workspaceMount": {
+        "status": "partial",
+        "note": "VirtioFS; use forward slashes for Windows paths."
+      },
+      "workspaceFolder": {
+        "status": "ok"
+      },
+      "containerEnv": {
+        "status": "ok",
+        "maps": "-e"
+      },
+      "remoteEnv": {
+        "status": "ok"
+      },
+      "forwardPorts": {
+        "status": "ok",
+        "maps": "-p"
+      },
+      "postCreateCommand": {
+        "status": "ok",
+        "maps": "wslc exec"
+      },
+      "postStartCommand": {
+        "status": "ok"
+      },
+      "postAttachCommand": {
+        "status": "ok"
+      },
+      "remoteUser": {
+        "status": "ok",
+        "maps": "-u"
+      },
+      "containerUser": {
+        "status": "ok"
+      },
+      "mounts": {
+        "status": "partial",
+        "note": "VirtioFS path rules apply."
+      },
+      "runArgs": {
+        "status": "partial",
+        "note": "Passed through verbatim; unsupported flags will fail at runtime."
+      },
+      "dockerComposeFile": {
+        "status": "missing",
+        "note": "No Compose runtime. Replace with a single image or build entry."
+      },
+      "features": {
+        "status": "missing",
+        "note": "Requires BuildKit metadata that wslc build does not emit."
+      },
+      "runServices": {
+        "status": "missing",
+        "note": "Compose-only key."
+      },
+      "shutdownAction": {
+        "status": "partial",
+        "note": "stopCompose is meaningless without Compose."
+      }
     },
     "requiredSetting": {
       "key": "dev.containers.dockerPath",
@@ -144,14 +382,46 @@
   "apiIncompatible": {
     "note": "CLI-driven tooling ports to wslc. API-driven tooling cannot, because wslc is daemonless and exposes no Docker Engine API or socket.",
     "tools": [
-      { "name": "Testcontainers", "via": "Engine API", "works": false },
-      { "name": "Docker-in-Docker sidecars", "via": "mounted socket", "works": false },
-      { "name": "Portainer", "via": "Engine API", "works": false },
-      { "name": "Lazydocker", "via": "Engine API", "works": false },
-      { "name": "LocalStack (docker mode)", "via": "Engine API", "works": false },
-      { "name": "act", "via": "Engine API", "works": false },
-      { "name": "VS Code Dev Containers", "via": "CLI binary", "works": true },
-      { "name": "shell scripts calling docker", "via": "CLI binary", "works": true }
+      {
+        "name": "Testcontainers",
+        "via": "Engine API",
+        "works": false
+      },
+      {
+        "name": "Docker-in-Docker sidecars",
+        "via": "mounted socket",
+        "works": false
+      },
+      {
+        "name": "Portainer",
+        "via": "Engine API",
+        "works": false
+      },
+      {
+        "name": "Lazydocker",
+        "via": "Engine API",
+        "works": false
+      },
+      {
+        "name": "LocalStack (docker mode)",
+        "via": "Engine API",
+        "works": false
+      },
+      {
+        "name": "act",
+        "via": "Engine API",
+        "works": false
+      },
+      {
+        "name": "VS Code Dev Containers",
+        "via": "CLI binary",
+        "works": true
+      },
+      {
+        "name": "shell scripts calling docker",
+        "via": "CLI binary",
+        "works": true
+      }
     ]
   },
   "links": {
@@ -163,5 +433,55 @@
     "vsDocker": "https://wslcontainers.com/guides/vs-docker-desktop/",
     "devcontainers": "https://wslcontainers.com/guides/vscode-dev-containers/",
     "testcontainers": "https://wslcontainers.com/guides/testcontainers/"
+  },
+  "renamedOptional": {
+    "$comment": "wslc accepts BOTH the docker-style short command and the noun-verb form (verified: `wslc ps` and `wslc container list` both exit 0). These rewrites are cosmetic; converters should not treat the short form as an error.",
+    "commands": {
+      "ps": "container list",
+      "images": "image list",
+      "rmi": "image remove",
+      "rm": "container remove",
+      "create": "container create"
+    }
+  },
+  "verification": {
+    "wslcVersion": "2.9.4.0",
+    "verifiedAt": "2026-07-29",
+    "method": "GitHub Actions windows-2025 runner, real wslc invocations",
+    "runs": [
+      "30417819781",
+      "30417964880",
+      "30418758451"
+    ]
+  },
+  "twoWord": {
+    "system prune": {
+      "status": "unsupported",
+      "note": "`wslc system` only exposes `session` in 2.9.4 — there is no `system prune`. Run the per-noun prunes instead: `wslc container prune`, `wslc image prune`, `wslc volume prune`, `wslc network prune`."
+    },
+    "system info": {
+      "status": "unsupported",
+      "note": "No `system info` in wslc 2.9.4. Use `wslc version`."
+    },
+    "system df": {
+      "status": "unsupported",
+      "note": "No `system df` in wslc 2.9.4. Inspect per-noun listings instead."
+    },
+    "container prune": {
+      "status": "supported",
+      "note": "Removes all stopped containers."
+    },
+    "image prune": {
+      "status": "supported",
+      "note": "Removes dangling images; --all removes all unused images."
+    },
+    "volume prune": {
+      "status": "supported",
+      "note": "Removes unused anonymous volumes; --all includes named ones."
+    },
+    "network prune": {
+      "status": "supported",
+      "note": "Removes all unused networks."
+    }
   }
 }

@@ -83,6 +83,11 @@ def tokenize(line: str) -> list[str]:
     return out
 
 
+# Verbs where wslc also accepts the docker-style top-level form, so rewriting to
+# the noun form is cosmetic rather than required. Verified on wslc 2.9.4.
+_ALIAS_OK = set(RULES.get("renamedOptional", {}).get("commands", {}))
+
+
 def _flag_spec(flag: str) -> tuple[str, dict[str, Any]] | tuple[None, None]:
     flags = RULES["flags"]
     if flag in flags:
@@ -120,6 +125,15 @@ def _translate_args(args: list[str], notes: list[Note]) -> list[str]:
                     notes.append(Note(branch.get("severity", "info"), branch["note"]))
                     i += consumed
                     continue
+                if branch["action"] == "error":
+                    # Value is passed through so the reader sees what they wrote,
+                    # but flagged as an error: wslc rejects it outright.
+                    notes.append(Note(branch.get("severity", "error"), branch["note"]))
+                    out.append(f"{bare}={value}" if has_inline else bare)
+                    if not has_inline and takes_value and value:
+                        out.append(value)
+                    i += consumed
+                    continue
             notes.append(Note(spec.get("severity", "info"), spec["note"]))
             out.append(f"{bare}={value}" if has_inline else bare)
             if not has_inline and takes_value and value:
@@ -142,6 +156,14 @@ def _translate_args(args: list[str], notes: list[Note]) -> list[str]:
         note_win = spec.get("noteWhenWindowsPath")
         if note_win and (WINDOWS_PATH.match(value) or value.startswith("/mnt/")):
             notes.append(Note(spec.get("severity", "info"), note_win))
+        # Some flags exist but reject certain value formats (verified: wslc wants
+        # uppercase size units, so `-m 512m` fails while `512M` works).
+        require = spec.get("requireValuePattern")
+        if require and value and not re.match(require, value):
+            notes.append(Note("error", spec["noteWhenValueRejected"]))
+        note_always = spec.get("noteAlways")
+        if note_always:
+            notes.append(Note(spec.get("severity", "info"), note_always))
         out.append(arg)
         if not has_inline and takes_value and value:
             out.append(value)
@@ -193,6 +215,20 @@ def translate_line(raw: str) -> Result | None:
         )
 
     two = f"{tokens[0]} {tokens[1]}" if len(tokens) > 1 else ""
+    # Two-word forms with a verified verdict of their own (e.g. `docker system
+    # prune` has no wslc equivalent, but the per-noun prunes do).
+    two_word = RULES.get("twoWord", {})
+    if two and two in two_word:
+        entry = two_word[two]
+        if entry["status"] == "unsupported":
+            notes.append(Note("error", entry["note"]))
+            return Result(
+                output=f"# {two}: not supported by wslc", notes=notes, unsupported_hit=True
+            )
+        notes.append(Note("info", entry["note"]))
+        rest = _translate_args(tokens[2:], notes)
+        return Result(output=" ".join(["wslc", two, *rest]).strip(), notes=notes)
+
     if two and two in (RULES["renamed"].values()):
         rest = _translate_args(tokens[2:], notes)
         return Result(output=" ".join(["wslc", two, *rest]).strip(), notes=notes)
@@ -216,7 +252,12 @@ def translate_line(raw: str) -> Result | None:
             Note(
                 "info",
                 f"`docker {verb}` is grouped under a noun in wslc: `wslc {mapped}`. "
-                f"Recent previews accept `wslc {verb}` as an alias, but the noun form is stable.",
+                + (
+                    f"`wslc {verb}` also works as a top-level alias (verified on 2.9.4), "
+                    "so this rewrite is cosmetic."
+                    if verb in _ALIAS_OK
+                    else f"There is no top-level `wslc {verb}`; the noun form is required."
+                ),
             )
         )
         return Result(output=" ".join(["wslc", mapped, *rest]).strip(), notes=notes)

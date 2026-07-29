@@ -109,5 +109,101 @@
   },
   {
     "command": "docker run --platform linux/amd64 --gpus all --network host --restart always -v C:/a:/b nginx"
+  },
+  {
+    "command": "docker restart web"
+  },
+  {
+    "command": "docker cp web:/etc/hosts ./hosts"
+  },
+  {
+    "command": "docker commit web img:1"
+  },
+  {
+    "command": "docker top web"
+  },
+  {
+    "command": "docker port web"
+  },
+  {
+    "command": "docker rename old new"
+  },
+  {
+    "command": "docker pause web"
+  },
+  {
+    "command": "docker unpause web"
+  },
+  {
+    "command": "docker wait web"
+  },
+  {
+    "command": "docker diff web"
+  },
+  {
+    "command": "docker info"
+  },
+  {
+    "command": "docker history alpine"
+  },
+  {
+    "command": "docker search nginx"
+  },
+  {
+    "command": "docker run -m 512m alpine sh"
+  },
+  {
+    "command": "docker run -m 512M alpine sh"
+  },
+  {
+    "command": "docker run --shm-size 64m alpine sh"
+  },
+  {
+    "command": "docker run --shm-size 64M alpine sh"
+  },
+  {
+    "command": "docker run --network host nginx"
+  },
+  {
+    "command": "docker run --network none alpine sh"
+  },
+  {
+    "command": "docker run --gpus all nvidia/cuda:12 nvidia-smi"
+  },
+  {
+    "command": "docker run --device /dev/null alpine sh"
+  },
+  {
+    "command": "docker run --health-cmd 'curl -f localhost' nginx"
+  },
+  {
+    "command": "docker run --cpus 1.5 alpine sh"
+  },
+  {
+    "command": "docker run --ulimit nofile=1024:1024 alpine sh"
+  },
+  {
+    "command": "docker run --stop-timeout 5 alpine sh"
+  },
+  {
+    "command": "docker system prune -a"
+  },
+  {
+    "command": "docker system df"
+  },
+  {
+    "command": "docker system info"
+  },
+  {
+    "command": "docker container prune"
+  },
+  {
+    "command": "docker image prune -a"
+  },
+  {
+    "command": "docker volume prune"
+  },
+  {
+    "command": "docker network prune"
   }
 ]
