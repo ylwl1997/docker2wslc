@@ -10,7 +10,7 @@ One rule table, four consumers. No network calls, no daemon, no telemetry.
 | [`docker2wslc`](packages/py) | [PyPI](https://pypi.org/project/docker2wslc/) | CLI + Python API: convert, compose, lint |
 | [`docker2wslc`](packages/cli) | [npm](https://www.npmjs.com/package/docker2wslc) | Same CLI for Node, same output |
 | [`wslc-mcp`](packages/mcp) | [npm](https://www.npmjs.com/package/wslc-mcp) | MCP server for Claude Code, Cursor, Windsurf |
-| [`wslc-compatibility`](packages/vscode) | VS Code Marketplace | Inline diagnostics for Compose / devcontainer files |
+| [`wslc-compatibility`](packages/vscode) | not published — install from `.vsix` | Inline diagnostics for Compose / devcontainer files |
 
 ## Quick start
 
@@ -72,7 +72,7 @@ exit code and notes) across the full case matrix.
 rules.json ──┬── packages/py      (PyPI)
              ├── packages/cli     (npm)
              ├── packages/mcp     (npm, MCP)
-             └── packages/vscode  (Marketplace)
+             └── packages/vscode  (.vsix, unpublished)
 ```
 
 ## Development
@@ -89,7 +89,11 @@ cd packages/cli && npm install && npm test
 cd packages/mcp && npm install && node test/e2e.mjs
 
 # VS Code extension (headless, stubbed vscode API)
-cd packages/vscode && npm install && node --test 'test/**/*.test.cjs'
+cd packages/vscode && npm install && npm test
+
+# Build the extension package, then install it locally
+cd packages/vscode && npx @vscode/vsce package --no-dependencies
+code --install-extension wslc-compatibility-0.2.0.vsix
 ```
 
 `rules.json` lives at the repo root and is copied into each package at build time. Edit the root

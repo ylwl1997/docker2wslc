@@ -78,6 +78,15 @@ the wrong arguments. All such values are now shell-quoted.
 - `--network host` and other `severity=error` findings now exit 2 instead of 1.
   CI gates keyed on exit 1 will see 2 for these.
 
+### Release status
+
+| Package | 0.2.0 |
+| --- | --- |
+| PyPI `docker2wslc` | published, verified by installing from pypi.org |
+| npm `docker2wslc` | published, verified by installing from registry.npmjs.org |
+| npm `wslc-mcp` | published, verified over a real stdio JSON-RPC round trip |
+| VS Code `wslc-compatibility` | `.vsix` builds and passes tests; **never published** to the Marketplace (no publisher token). Install the `.vsix` manually. |
+
 ## 0.1.0
 
 Initial release.
