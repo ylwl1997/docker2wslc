@@ -71,11 +71,23 @@ jobs:
           Write-Host $json
           Set-Content -Path result.json -Value $json -Encoding utf8
 
+          # A "fails on wslc" outcome is a valid, expected result to collect and
+          # report -- it must not be conflated with this step erroring out.
+          # GitHub Actions appends `exit $LASTEXITCODE` after pwsh steps, and the
+          # last native call above (wslc version) would otherwise leave a stale
+          # non-zero code here that silently skips the report-back step below.
+          exit 0
+
       - name: Report back to wslcontainers.com
+        if: always()
         shell: pwsh
         env:
           INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
         run: |
+          if (-not (Test-Path result.json)) {
+            Write-Warning "result.json missing (test step likely crashed before writing it) -- nothing to report."
+            exit 0
+          }
           $body = Get-Content result.json -Raw
           Invoke-RestMethod -Uri 'https://wslcontainers.com/api/ingest' `
             -Method Post `
