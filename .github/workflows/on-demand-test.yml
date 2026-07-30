@@ -1,0 +1,84 @@
+name: on-demand image test
+
+# Triggered by wslcontainers.com's /api/ask when a user asks about an image
+# with no verified result yet. Runs a real wslc pull+run, then POSTs the
+# outcome back to /api/ingest so the next lookup for the same image is
+# verified instead of predicted.
+on:
+  repository_dispatch:
+    types: [test-image]
+
+jobs:
+  test:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - name: Install wslc
+        shell: pwsh
+        run: |
+          wsl --update --pre-release
+          wsl --version
+
+      - name: Validate image reference
+        id: validate
+        shell: pwsh
+        run: |
+          $ref = "${{ github.event.client_payload.image }}"
+          # Mirrors the regex /api/ask already applies before dispatching --
+          # re-checked here since this step is what actually shells out.
+          if ($ref -notmatch '^[a-z0-9][a-z0-9._/-]{0,120}(:[a-z0-9._-]{1,60})?$') {
+            Write-Error "Rejected image reference: $ref"
+            exit 1
+          }
+          echo "ref=$ref" >> $env:GITHUB_OUTPUT
+
+      - name: Test image
+        id: test
+        shell: pwsh
+        run: |
+          $ref = "${{ steps.validate.outputs.ref }}"
+          $wslc = 'C:\Program Files\WSL\wslc.exe'
+          $t0 = Get-Date
+
+          $pull = & $wslc image pull $ref 2>&1 | Out-String
+          $pullExit = $LASTEXITCODE
+          $pullTail = ($pull -split "`n" | Where-Object { $_.Trim() } | Select-Object -Last 1)
+
+          $runExit = $null; $runOk = $false; $runTail = 'skipped, pull failed'
+          if ($pullExit -eq 0) {
+            $run = & $wslc run --rm $ref /bin/sh -c 'echo PROBE_OK' 2>&1 | Out-String
+            $runExit = $LASTEXITCODE
+            $runOk = [bool]($run -match 'PROBE_OK')
+            $runTail = ($run -split "`n" | Where-Object { $_.Trim() } | Select-Object -Last 1)
+          }
+
+          $seconds = [math]::Round(((Get-Date) - $t0).TotalSeconds, 1)
+          $wslcVersion = (& $wslc version 2>&1 | Select-Object -First 1)
+
+          $payload = [ordered]@{
+            image        = $ref
+            requestId    = "${{ github.event.client_payload.requestId }}"
+            pullExit     = $pullExit
+            runExit      = $runExit
+            runOk        = $runOk
+            pullTail     = $pullTail
+            runTail      = $runTail
+            seconds      = $seconds
+            wslcVersion  = $wslcVersion
+            testedAt     = (Get-Date).ToUniversalTime().ToString('o')
+          }
+          $json = $payload | ConvertTo-Json -Compress
+          Write-Host $json
+          Set-Content -Path result.json -Value $json -Encoding utf8
+
+      - name: Report back to wslcontainers.com
+        shell: pwsh
+        env:
+          INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
+        run: |
+          $body = Get-Content result.json -Raw
+          Invoke-RestMethod -Uri 'https://wslcontainers.com/api/ingest' `
+            -Method Post `
+            -Headers @{ Authorization = "Bearer $env:INGEST_SECRET" } `
+            -ContentType 'application/json' `
+            -Body $body
