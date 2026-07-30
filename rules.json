@@ -20,36 +20,15 @@
     "save",
     "load",
     "attach",
-    "version"
+    "version",
+    "ps",
+    "images",
+    "rmi",
+    "rm",
+    "create",
+    "cp"
   ],
-  "renamed": {
-    "ps": "container list",
-    "images": "image list",
-    "rmi": "image remove",
-    "rm": "container remove",
-    "create": "container create",
-    "cp": "container cp"
-  },
-  "renamedFlags": {
-    "ps": {
-      "-a": "--all",
-      "--all": "--all",
-      "-q": "--quiet",
-      "--quiet": "--quiet"
-    },
-    "images": {
-      "-a": "--all",
-      "--all": "--all"
-    },
-    "rm": {
-      "-f": "--force",
-      "--force": "--force"
-    },
-    "rmi": {
-      "-f": "--force",
-      "--force": "--force"
-    }
-  },
+  "renamed": {},
   "unsupported": {
     "swarm": "Swarm orchestration has no wslc equivalent. Use Kubernetes or keep Docker for this workload.",
     "service": "Swarm services are not supported by wslc.",
@@ -568,5 +547,14 @@
       "status": "supported",
       "note": "Removes all unused networks."
     }
+  },
+  "passthrough": {
+    "$comment": "These commands work in BOTH short form (docker-like) and long form (noun verb). Both are native in wslc 2.9.4.",
+    "cp": "short 'cp' and long 'container cp' both work",
+    "create": "short 'create' and long 'container create' both work",
+    "images": "short 'images' and long 'image list' both work",
+    "ps": "short 'ps' and long 'container list' both work",
+    "rm": "short 'rm' and long 'container remove' both work",
+    "rmi": "short 'rmi' and long 'image remove' both work"
   }
 }
