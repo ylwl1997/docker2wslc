@@ -1,5 +1,5 @@
 {
-  "$comment": "Single source of truth for Docker -> wslc translation. Consumed by the Python package, the npm CLI, the MCP server and the VS Code extension. Do not fork this logic per language. Every claim here is verified against a real wslc on a windows-2025 runner; see `verification`.",
+  "": "Single source of truth for Docker -> wslc translation. Consumed by the Python package, the npm CLI, the MCP server and the VS Code extension. Do not fork this logic per language. Every claim here is verified against a real wslc on a windows-2025 runner; see .",
   "schemaVersion": 2,
   "wslcPreview": "2.9.4.0",
   "identical": [
@@ -25,10 +25,11 @@
     "images",
     "rmi",
     "rm",
-    "create",
-    "cp"
+    "create"
   ],
-  "renamed": {},
+  "renamed": {
+    "cp": "container cp"
+  },
   "unsupported": {
     "swarm": "Swarm orchestration has no wslc equivalent. Use Kubernetes or keep Docker for this workload.",
     "service": "Swarm services are not supported by wslc.",
@@ -42,17 +43,17 @@
     "manifest": "Manifest lists cannot be created with wslc in the preview.",
     "trust": "Docker Content Trust is Docker-specific and has no wslc equivalent.",
     "checkpoint": "Checkpoint/restore is not implemented in wslc.",
-    "restart": "No restart command in wslc 2.9.4. Run `wslc stop <id>` then `wslc start <id>`.",
+    "restart": "No restart command in wslc 2.9.4. Run  then .",
     "pause": "Pause/unpause (SIGSTOP freezing) is not implemented in wslc 2.9.4.",
     "unpause": "Pause/unpause is not implemented in wslc 2.9.4.",
-    "info": "No `system info`. `wslc system` only exposes `session`. Use `wslc version` for build info.",
-    "top": "No `top`. Use `wslc exec <id> ps aux` inside the container.",
-    "wait": "No `wait`. Poll `wslc container list` or run the container in the foreground without --detach.",
-    "port": "No `port` command. Published ports are shown in the PORTS column of `wslc container list`.",
+    "info": "No .  only exposes . Use  for build info.",
+    "top": "No . Use  inside the container.",
+    "wait": "No . Poll  or run the container in the foreground without --detach.",
+    "port": "No  command. Published ports are shown in the PORTS column of .",
     "rename": "Containers cannot be renamed in wslc 2.9.4. Recreate with the desired --name.",
-    "diff": "No filesystem diff. `wslc export <id>` writes the container filesystem to a tar for inspection.",
-    "commit": "No commit. Use `wslc export` then `wslc import`, or build from a Dockerfile.",
-    "history": "wslc 2.9.4 has no image history. `wslc image inspect` shows config but not per-layer history.",
+    "diff": "No filesystem diff.  writes the container filesystem to a tar for inspection.",
+    "commit": "No commit. Use  then , or build from a Dockerfile.",
+    "history": "wslc 2.9.4 has no image history.  shows config but not per-layer history.",
     "search": "wslc 2.9.4 cannot search a registry. Browse Docker Hub / the registry web UI instead."
   },
   "flags": {
@@ -60,7 +61,7 @@
       "action": "drop",
       "takesValue": true,
       "severity": "warn",
-      "note": "`--platform` is dropped: wslc builds and runs for the host architecture only in the preview."
+      "note": " is dropped: wslc builds and runs for the host architecture only in the preview."
     },
     "--restart": {
       "action": "drop",
@@ -72,8 +73,8 @@
       "action": "keep",
       "takesValue": true,
       "severity": "info",
-      "note": "`--gpus` is native in wslc 2.9.4 (`--gpus all`). Do NOT rewrite it to `--device`: wslc has no --device flag. On a host without an NVIDIA GPU the run fails at container init with an ldconfig error.",
-      "noteAlways": "`--gpus` is native in wslc 2.9.4, but the host must actually have the GPU: on a machine without one, `--gpus all` fails at container init with an ldconfig error."
+      "note": " is native in wslc 2.9.4 (). Do NOT rewrite it to : wslc has no --device flag. On a host without an NVIDIA GPU the run fails at container init with an ldconfig error.",
+      "noteAlways": " is native in wslc 2.9.4, but the host must actually have the GPU: on a machine without one,  fails at container init with an ldconfig error."
     },
     "--network": {
       "action": "conditional",
@@ -82,11 +83,11 @@
         "host": {
           "action": "error",
           "severity": "error",
-          "note": "wslc rejects host networking outright: `host mode networking is not supported` (exit 1). It is not implicit and cannot be dropped silently. `--network none` works."
+          "note": "wslc rejects host networking outright:  (exit 1). It is not implicit and cannot be dropped silently.  works."
         }
       },
       "severity": "info",
-      "note": "Custom networks are supported: create with `wslc network create`, then `wslc network connect`. `none` is valid; `host` is rejected."
+      "note": "Custom networks are supported: create with , then .  is valid;  is rejected."
     },
     "--volume": {
       "action": "keep",
@@ -96,30 +97,30 @@
         "--mount"
       ],
       "severity": "info",
-      "noteWhenWindowsPath": "Windows host paths are shared over VirtioFS. Use forward slashes (`C:/work:/app`) and expect Linux-style permissions on the container side."
+      "noteWhenWindowsPath": "Windows host paths are shared over VirtioFS. Use forward slashes () and expect Linux-style permissions on the container side."
     },
     "--memory": {
       "action": "keep",
       "takesValue": true,
       "severity": "info",
-      "note": "Supported (`-m`). Unit suffix must be UPPERCASE: `512M` works, `512m` is rejected with `Invalid memory argument value`. Plain byte counts also work. Expect a kernel warning that swap limits are unavailable.",
+      "note": "Supported (). Unit suffix must be UPPERCASE:  works,  is rejected with . Plain byte counts also work. Expect a kernel warning that swap limits are unavailable.",
       "requireValuePattern": "^[0-9]+([KMGT]|[KMGT]B)?$",
-      "noteWhenValueRejected": "wslc rejects lowercase size units: `--memory 512m` fails with `Invalid memory argument value`. Use an UPPERCASE suffix (512M, 1G) or a plain byte count.",
+      "noteWhenValueRejected": "wslc rejects lowercase size units:  fails with . Use an UPPERCASE suffix (512M, 1G) or a plain byte count.",
       "aliases": [
         "-m"
       ],
       "fixValueCase": "upperSizeSuffix",
-      "noteWhenValueFixed": "Rewrote the size to use an UPPERCASE unit suffix: wslc rejects lowercase units (`Invalid memory argument value`) while Docker accepts both."
+      "noteWhenValueFixed": "Rewrote the size to use an UPPERCASE unit suffix: wslc rejects lowercase units () while Docker accepts both."
     },
     "--shm-size": {
       "action": "keep",
       "takesValue": true,
       "severity": "info",
-      "note": "Supported. Same uppercase-unit rule as --memory: `64M` works, `64m` is rejected.",
+      "note": "Supported. Same uppercase-unit rule as --memory:  works,  is rejected.",
       "requireValuePattern": "^[0-9]+([KMGT]|[KMGT]B)?$",
-      "noteWhenValueRejected": "wslc rejects lowercase size units: `--shm-size 64m` fails with `Invalid shm-size argument value`. Use an UPPERCASE suffix (64M, 1G).",
+      "noteWhenValueRejected": "wslc rejects lowercase size units:  fails with . Use an UPPERCASE suffix (64M, 1G).",
       "fixValueCase": "upperSizeSuffix",
-      "noteWhenValueFixed": "Rewrote the size to use an UPPERCASE unit suffix: wslc rejects lowercase units (`Invalid shm-size argument value`) while Docker accepts both."
+      "noteWhenValueFixed": "Rewrote the size to use an UPPERCASE unit suffix: wslc rejects lowercase units () while Docker accepts both."
     },
     "--cpus": {
       "action": "keep",
@@ -131,7 +132,7 @@
       "action": "keep",
       "takesValue": true,
       "severity": "info",
-      "note": "Supported, e.g. `--ulimit nofile=1024:1024`."
+      "note": "Supported, e.g. ."
     },
     "--stop-timeout": {
       "action": "keep",
@@ -149,7 +150,7 @@
       "action": "drop",
       "takesValue": true,
       "severity": "warn",
-      "note": "wslc 2.9.4 has no --device flag (`Argument name was not recognized`). For GPUs use --gpus."
+      "note": "wslc 2.9.4 has no --device flag (). For GPUs use --gpus."
     },
     "--publish": {
       "action": "keep",
@@ -158,31 +159,31 @@
         "-p"
       ],
       "severity": "info",
-      "note": "Supported (`-p`). `-P/--publish-all` publishes all exposed ports."
+      "note": "Supported ().  publishes all exposed ports."
     },
     "--cap-add": {
       "action": "drop",
       "takesValue": true,
       "severity": "warn",
-      "note": "wslc 2.9.4 has no --cap-add (`Argument name was not recognized`). There is no way to grant extra capabilities; --privileged and --security-opt are missing too."
+      "note": "wslc 2.9.4 has no --cap-add (). There is no way to grant extra capabilities; --privileged and --security-opt are missing too."
     },
     "--cap-drop": {
       "action": "drop",
       "takesValue": true,
       "severity": "warn",
-      "note": "wslc 2.9.4 has no --cap-drop (`Argument name was not recognized`)."
+      "note": "wslc 2.9.4 has no --cap-drop ()."
     },
     "--privileged": {
       "action": "drop",
       "takesValue": false,
       "severity": "warn",
-      "note": "wslc 2.9.4 has no --privileged (`Argument name was not recognized`)."
+      "note": "wslc 2.9.4 has no --privileged ()."
     },
     "--security-opt": {
       "action": "drop",
       "takesValue": true,
       "severity": "warn",
-      "note": "wslc 2.9.4 has no --security-opt (`Argument name was not recognized`)."
+      "note": "wslc 2.9.4 has no --security-opt ()."
     },
     "--expose": {
       "action": "drop",
@@ -256,7 +257,7 @@
       },
       "cap_add": {
         "status": "missing",
-        "note": "wslc 2.9.4 has no --cap-add (`Argument name was not recognized`), and no --privileged or --security-opt either."
+        "note": "wslc 2.9.4 has no --cap-add (), and no --privileged or --security-opt either."
       },
       "devices": {
         "status": "missing",
@@ -318,7 +319,7 @@
       },
       "network_mode": {
         "status": "missing",
-        "note": "network_mode: host is refused with `host mode networking is not supported`. Use a user-defined network plus published ports."
+        "note": "network_mode: host is refused with . Use a user-defined network plus published ports."
       },
       "privileged": {
         "status": "missing",
@@ -499,7 +500,7 @@
     "testcontainers": "https://wslcontainers.com/guides/testcontainers/"
   },
   "renamedOptional": {
-    "$comment": "wslc accepts BOTH the docker-style short command and the noun-verb form (verified: `wslc ps` and `wslc container list` both exit 0). These rewrites are cosmetic; converters should not treat the short form as an error.",
+    "": "wslc accepts BOTH the docker-style short command and the noun-verb form (verified:  and  both exit 0). These rewrites are cosmetic; converters should not treat the short form as an error.",
     "commands": {
       "ps": "container list",
       "images": "image list",
@@ -521,15 +522,15 @@
   "twoWord": {
     "system prune": {
       "status": "unsupported",
-      "note": "`wslc system` only exposes `session` in 2.9.4 — there is no `system prune`. Run the per-noun prunes instead: `wslc container prune`, `wslc image prune`, `wslc volume prune`, `wslc network prune`."
+      "note": " only exposes  in 2.9.4 — there is no . Run the per-noun prunes instead: , , , ."
     },
     "system info": {
       "status": "unsupported",
-      "note": "No `system info` in wslc 2.9.4. Use `wslc version`."
+      "note": "No  in wslc 2.9.4. Use ."
     },
     "system df": {
       "status": "unsupported",
-      "note": "No `system df` in wslc 2.9.4. Inspect per-noun listings instead."
+      "note": "No  in wslc 2.9.4. Inspect per-noun listings instead."
     },
     "container prune": {
       "status": "supported",
@@ -549,8 +550,8 @@
     }
   },
   "passthrough": {
-    "$comment": "These commands work in BOTH short form (docker-like) and long form (noun verb). Both are native in wslc 2.9.4.",
-    "cp": "short 'cp' and long 'container cp' both work",
+    "": "These commands work in BOTH short form (docker-like) and long form (noun verb). Both are native in wslc 2.9.4.",
+    "cp": "Only long form container cp works in wslc 2.9.4; top-level cp is not recognized",
     "create": "short 'create' and long 'container create' both work",
     "images": "short 'images' and long 'image list' both work",
     "ps": "short 'ps' and long 'container list' both work",
